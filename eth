@@ -1,0 +1,85 @@
+#!/bin/bash
+###
+# Include your etherscan.io API key here
+###
+apiKey=YOUR_API_KEY
+
+while [ -n "$1" ]; do 
+  case "$1" in
+##############
+# Use -a flag to query by address
+# It will pull the most recent transaction
+# and then put the respective TX hash
+# into the subsequent steps
+##############
+    -a) read -p "address: " addy
+        hash=$(curl --silent "https://api.etherscan.io/api?module=account&action=txlist&address=${addy}&page=1&offset=3&sort=desc&apikey=${apiKey}"     | jq -r '.result[0].hash')
+          echo "Bet Hash: "
+          echo "$hash"
+
+        rec=$(curl --silent "https://api.etherscan.io/api?module=proxy&action=eth_getTransactionReceipt&txhash=${hash}"|   jq -r ".result.logs[1].topics[1]" | cut -c 3-)
+          echo "TX Receipt: "
+          echo "$rec"
+ 
+        roll=$(curl --silent "https://blockscout.com/eth/mainnet/api?module=transaction&action=gettxinfo&txhash=${hash}" | jq -r '.result.input')
+          echo "Roll Data: "
+          echo "$roll"
+
+        num=$($HOME/testing/eth/temp/ethereum-input-data-decoder/bin/ethereum_input_data_decoder --abi $HOME/testing/eth/abi.json  $roll)
+          echo " "
+          echo "Player Bet: "
+          echo "$num" |sed -n 2p |  awk '{print $2}'
+
+        res=$(curl --silent "https://api.oraclize.it/v1/query/eth_mainnet_${rec}/status" | jq -r ".result.checks[0].results")
+          echo " "
+          echo -n "Result: " 
+          echo -n  "$res" | awk '{print $2}' | cut -c 2-4
+  ;;  
+
+#####################
+# Use -t flag to specify a TX hash
+# which is then used to query your
+# result
+#####################
+  -t) read -p "hash: " hash
+        rec=$(curl --silent "https://api.etherscan.io/api?module=proxy&action=eth_getTransactionReceipt&txhash=${hash}"|   jq -r ".result.logs[1].topics[1]" | cut -c 3-)
+           echo "TX Receipt: "
+           echo "$rec"
+ 
+        roll=$(curl --silent "https://blockscout.com/eth/mainnet/api?module=transaction&action=gettxinfo&txhash=${hash}" | jq -r '.result.input')
+            echo "Roll Data: "
+            echo "$roll"
+
+        num=$($HOME/testing/eth/temp/ethereum-input-data-decoder/bin/ethereum_input_data_decoder --abi $HOME/testing/eth/abi.json  $roll)
+            echo " "
+            echo "Player Bet: "
+            echo "$num" |sed -n 2p |  awk '{print $2}'
+
+        res=$(curl --silent "https://api.oraclize.it/v1/query/eth_mainnet_${rec}/status" | jq -r ".result.checks[0].results")
+            echo " "
+            echo -n "Result: "
+            echo -n  "$res" | awk '{print $2}' | cut -c 2-4
+ ;;
+
+######################
+# Include whatever address you
+# want to track here and just use
+# -t flag to get results without
+# asking for any input otherwise
+# run with -a or -t and input
+# address or hash when prompted
+######################
+  -c)
+address=YOUR_ETHER_ADDRESS
+        hash=$(curl --silent "https://api.etherscan.io/api?module=account&action=txlist&address=${address}&page=1&offset=3&sort=desc&apikey=${apiKey}"    | jq -r '.result[0].hash')
+            echo "$hash"
+
+        rec=$(curl --silent "https://api.etherscan.io/api?module=proxy&action=eth_getTransactionReceipt&txhash=${hash}"|  jq -r ".result.logs[1].topics[1]" | cut -c 3-)
+            echo "$rec"
+
+        res=$(curl --silent "https://api.oraclize.it/v1/query/eth_mainnet_${rec}/status" | jq -r ".result.checks[0].results")
+            echo "$res"|awk '{print $2}'
+  ;;
+esac
+shift
+done
